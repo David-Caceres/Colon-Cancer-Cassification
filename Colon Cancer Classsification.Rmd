@@ -23,7 +23,7 @@ library(cowplot)
 ```
 
 
-# Leemos los datos y damos formato a los dataframes
+# Reading data
 ```{r}
 quality<-read.table(file="Quality features/Quality_table.tsv", header = TRUE, sep = "\t")
 quality$Batch<-as.factor(quality$Batch)
@@ -43,7 +43,7 @@ colnames(mapping)<-c("sample",  "Batch", "Uniquely_mapped", "Mapped_multiple_loc
 mapped<-melt(setDT(mapping),id.vars = c("sample", "Batch"))
 ```
 
-
+## Mapping distribution plot
 ```{r}
 mapped <- mapped |> 
   mutate(sample1 = reorder(sample, -ifelse(!variable %in% "Uniquely_mapped", 0, value), FUN = sum))
@@ -94,6 +94,7 @@ colnames(Adapter_found)<-c("sample", "Batch", "Adapter_found_perc","Adapter_not_
 Adapter_found<-melt(setDT(Adapter_found),id.vars = c("sample", "Batch"))
 ```
 
+## Trimming distribution plot
 
 ```{r}
 Adapter_found <- Adapter_found |> 
@@ -143,6 +144,7 @@ colnames(AdapterLex_found)<-c("sample", "Batch", "AdapterLex_found_perc","Other_
 AdapterLex_found<-melt(setDT(AdapterLex_found),id.vars = c("sample", "Batch"))
 ```
 
+## Lexogen adapter distribution plot
 
 ```{r}
 AdapterLex_found <- AdapterLex_found |> 
@@ -186,12 +188,15 @@ p3_q
 ## Dataframe format
 
 ```{r}
-Total_reads<-data.frame(rownames(quality),quality$Batch, quality$Total.reads)
+Total_reads<-data.frame(rownames(quality),quality$Batch, quality$Total.input.reads)
 
 colnames(Total_reads)<-c("sample", "Batch", "Total_reads")
 
 Total_reads<-melt(setDT(Total_reads),id.vars = c("sample", "Batch"))
 ```
+
+
+## Total reads distribution plot
 
 ```{r}
 Total_reads <- Total_reads |> 
@@ -201,7 +206,7 @@ Total_reads <- Total_reads |>
 p4 <- ggplot(Total_reads,aes(x = sample1, y = value, fill = factor(variable, levels=c("Total_reads")), width=1.05)) +
     geom_bar( stat = "identity", position = position_stack()) +
     scale_y_continuous(expand = c(0, 0)) +
-    labs(x = NULL, y= "Reads" , title="Total Reads Distribution", 
+    labs(x = NULL, y= "Reads" , title="Total Imput Reads Distribution", 
          fill="Quality Control") +
     theme(axis.text.x = element_blank(),
           axis.ticks.x = element_blank(),
@@ -228,5 +233,164 @@ p4_axis <- ggplot(Total_reads1, aes(x = sample1, y = factor(1),
 
 p4_q<-p4 / p4_axis + plot_layout(heights = c(8,1))  + scale_fill_jama()
 p4_q
+```
+
+
+
+
+# Total Reads after adapter trimming
+## Dataframe format
+
+```{r}
+Total_reads_trim<-data.frame(rownames(quality),quality$Batch, quality$FastQC_mqc.generalstats.fastqc.total_sequences)
+
+colnames(Total_reads_trim)<-c("sample", "Batch", "Total_sequences")
+
+Total_reads_trim<-melt(setDT(Total_reads_trim),id.vars = c("sample", "Batch"))
+```
+
+
+## Total reads after trimming distribution plot
+
+```{r}
+Total_reads_trim <- Total_reads_trim |> 
+  mutate(sample1 = reorder(sample, -ifelse(!variable %in% "Total_sequences", 0, value), FUN = sum))
+
+
+p5 <- ggplot(Total_reads_trim,aes(x = sample1, y = value, fill = factor(variable, levels=c("Total_sequences")), width=1.05)) +
+    geom_bar( stat = "identity", position = position_stack()) +
+    scale_y_continuous(expand = c(0, 0)) +
+    labs(x = NULL, y= "Reads" , title="Total Reads distribution after trimming", 
+         fill="Quality Control") +
+    theme(axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.ticks.length.x = unit(0, "pt")) +
+    theme(
+        panel.background = element_rect(fill='transparent'),
+        plot.background = element_rect(fill='transparent', color=NA),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.background = element_rect(fill='transparent'),
+        legend.box.background = element_rect(fill='transparent'),
+        plot.title = element_text(face="bold")
+    ) + scale_fill_d3(labels=c("Total Reads"))
+
+Total_reads1 <- Total_reads |>
+    distinct(sample, sample1, Batch)
+
+p5_axis <- ggplot(Total_reads1, aes(x = sample1, y = factor(1), 
+                                 fill = Batch)) +
+    geom_tile(width = 1) +
+    theme_void() +
+    theme(axis.title.x = element_text()) + theme(legend.position = "right")  +
+    labs(x="Batch Annotation", fill="Batch") 
+
+p5_q<-p5 / p5_axis + plot_layout(heights = c(8,1))  + scale_fill_jama()
+p5_q
+```
+
+
+# Duplicate reads distribution
+## Dataframe format
+
+```{r}
+Duplicate<-data.frame(rownames(quality),quality$Batch, quality$FastQC_mqc.generalstats.fastqc.percent_duplicates)
+
+colnames(Duplicate)<-c("sample", "Batch", "Duplicates")
+
+Duplicate<-melt(setDT(Duplicate),id.vars = c("sample", "Batch"))
+```
+
+
+
+```{r}
+Duplicate <- Duplicate |> 
+  mutate(sample1 = reorder(sample, -ifelse(!variable %in% "Duplicates", 0, value), FUN = sum))
+
+
+p6 <- ggplot(Duplicate,aes(x = sample1, y = value, fill = factor(variable, levels=c("Duplicates")), width=1.05)) +
+    geom_bar( stat = "identity", position = position_stack()) +
+    scale_y_continuous(expand = c(0, 0)) +
+    labs(x = NULL, y= "Reads%" , title="Duplicates% Distribution", 
+         fill="Quality Control") +
+    theme(axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.ticks.length.x = unit(0, "pt")) +
+    theme(
+        panel.background = element_rect(fill='transparent'),
+        plot.background = element_rect(fill='transparent', color=NA),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.background = element_rect(fill='transparent'),
+        legend.box.background = element_rect(fill='transparent'),
+        plot.title = element_text(face="bold")
+    ) + scale_fill_d3(labels=c("Reads%"))
+
+Duplicate1 <- Duplicate |>
+    distinct(sample, sample1, Batch)
+
+p6_axis <- ggplot(Duplicate, aes(x = sample1, y = factor(1), 
+                                 fill = Batch)) +
+    geom_tile(width = 1) +
+    theme_void() +
+    theme(axis.title.x = element_text()) + theme(legend.position = "right")  +
+    labs(x="Batch Annotation", fill="Batch") 
+
+p6_q<-p6 / p6_axis + plot_layout(heights = c(8,1))  + scale_fill_jama()
+p6_q
+```
+
+# Read length distribution
+
+## Dataframe format
+
+```{r}
+Length<-data.frame(rownames(quality),quality$Batch, quality$FastQC_mqc.generalstats.fastqc.avg_sequence_length)
+
+colnames(Length)<-c("sample", "Batch", "Length")
+
+Length<-melt(setDT(Length),id.vars = c("sample", "Batch"))
+```
+
+
+```{r}
+Length <- Length |> 
+  mutate(sample1 = reorder(sample, -ifelse(!variable %in% "Length", 0, value), FUN = sum))
+
+
+p7 <- ggplot(Length,aes(x = sample1, y = value, fill = factor(variable, levels=c("Length")), width=1.05)) +
+    geom_bar( stat = "identity", position = position_stack()) +
+    scale_y_continuous(expand = c(0, 0)) +
+    labs(x = NULL, y= "Reads length (bp)" , title="Read length Distribution", 
+         fill="Quality Control") +
+    theme(axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.ticks.length.x = unit(0, "pt")) +
+    theme(
+        panel.background = element_rect(fill='transparent'),
+        plot.background = element_rect(fill='transparent', color=NA),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.background = element_rect(fill='transparent'),
+        legend.box.background = element_rect(fill='transparent'),
+        plot.title = element_text(face="bold")
+    ) + scale_fill_d3(labels=c("Read length"))
+
+Length1 <- Length |>
+    distinct(sample, sample1, Batch)
+
+p7_axis <- ggplot(Length1, aes(x = sample1, y = factor(1), 
+                                 fill = Batch)) +
+    geom_tile(width = 1) +
+    theme_void() +
+    theme(axis.title.x = element_text()) + theme(legend.position = "right")  +
+    labs(x="Batch Annotation", fill="Batch") 
+
+p7_q<-p7 / p7_axis + plot_layout(heights = c(8,1))  + scale_fill_jama()
+p7_q
+```
+
+```{r}
+plot_grid(p1_q,p4_q, p5_q, p6_q, p2_q, p3_q)
 ```
 
