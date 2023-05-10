@@ -1,0 +1,232 @@
+---
+title: "Colon Cancer classification"
+author: "David Cáceres"
+date: "2023-05-09"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(reshape2)
+library(data.table)
+library(dplyr)
+library(ggplot2)
+library(ggsci)
+library(patchwork)
+library(cowplot)
+```
+
+
+# Leemos los datos y damos formato a los dataframes
+```{r}
+quality<-read.table(file="Quality features/Quality_table.tsv", header = TRUE, sep = "\t")
+quality$Batch<-as.factor(quality$Batch)
+rownames(quality)<-quality$Sample
+quality<-quality[,-1]
+```
+
+# Mapping distribution
+
+## Dataframe format
+
+```{r}
+mapping<-data.frame(rownames(quality), quality$Batch, quality$Uniquely.mapped.reads.perc, quality$perc.of.reads.mapped.to.multiple.loci,quality$perc.of.reads.mapped.to.too.many.loci, quality$perc.of.reads.unmapped..too.short, quality$perc.of.reads.unmapped..other)
+
+colnames(mapping)<-c("sample",  "Batch", "Uniquely_mapped", "Mapped_multiple_loci","Mapped_many_loci", "Unmapped_short", "Unmaped_other")
+
+mapped<-melt(setDT(mapping),id.vars = c("sample", "Batch"))
+```
+
+
+```{r}
+mapped <- mapped |> 
+  mutate(sample1 = reorder(sample, -ifelse(!variable %in% "Uniquely_mapped", 0, value), FUN = sum))
+
+
+p1 <- ggplot(mapped,aes(x = sample1, y = value, fill = factor(variable, levels=c("Unmaped_other", "Unmapped_short","Mapped_many_loci", "Mapped_multiple_loci", "Uniquely_mapped")), width=1.05)) +
+    geom_bar( stat = "identity", position = position_stack()) +
+    scale_y_continuous(expand = c(0, 0), breaks = seq(0, 100, by = 10)) +
+    labs(x = NULL, y= "% Reads" , title="Mapped reads% Distribution", 
+         fill="Quality Control") +
+    theme(axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.ticks.length.x = unit(0, "pt")) +
+    theme(
+        panel.background = element_rect(fill='transparent'),
+        plot.background = element_rect(fill='transparent', color=NA),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.background = element_rect(fill='transparent'),
+        legend.box.background = element_rect(fill='transparent'),
+        plot.title = element_text(face="bold")
+    ) + scale_fill_locuszoom(labels=c("Unmaped other","Unmaped short","Mapped many loci", "Mapped multiple", "Uniquely mapped"
+                                     ))
+mapped1 <- mapped |>
+    distinct(sample, sample1, Batch)
+
+p_axis <- ggplot(mapped1, aes(x = sample1, y = factor(1), 
+                                 fill = Batch)) +
+    geom_tile(width = 1) +
+    theme_void() +
+    theme(axis.title.x = element_text()) + theme(legend.position = "right")  +
+    labs(x="Batch Annotation", fill="Batch") 
+
+p1_q<-p1 / p_axis + plot_layout(heights = c(8,1))  + scale_fill_jama()
+p1_q
+```
+
+
+# Trimming distribution
+
+## Dataframe format
+
+```{r}
+Adapter_found<-data.frame(rownames(quality),quality$Batch, quality$Adapter.found.perc, quality$Adapter.not.found)
+
+colnames(Adapter_found)<-c("sample", "Batch", "Adapter_found_perc","Adapter_not_found_perc")
+
+Adapter_found<-melt(setDT(Adapter_found),id.vars = c("sample", "Batch"))
+```
+
+
+```{r}
+Adapter_found <- Adapter_found |> 
+  mutate(sample1 = reorder(sample, -ifelse(!variable %in% "Adapter_found_perc", 0, value), FUN = sum))
+
+
+p2 <- ggplot(Adapter_found,aes(x = sample1, y = value, fill = factor(variable, levels=c("Adapter_not_found_perc", "Adapter_found_perc")), width=1.05)) +
+    geom_bar( stat = "identity", position = position_stack()) +
+    scale_y_continuous(expand = c(0, 0), breaks = seq(0, 100, by = 10)) +
+    labs(x = NULL, y= "% Reads" , title="Adapter Reads% Distribution", 
+         fill="Quality Control") +
+    theme(axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.ticks.length.x = unit(0, "pt")) +
+    theme(
+        panel.background = element_rect(fill='transparent'),
+        plot.background = element_rect(fill='transparent', color=NA),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.background = element_rect(fill='transparent'),
+        legend.box.background = element_rect(fill='transparent'),
+        plot.title = element_text(face="bold")
+    ) + scale_fill_uchicago(labels=c("Adapter not found", "Adapter found"))
+
+Adapter_found1 <- Adapter_found |>
+    distinct(sample, sample1, Batch)
+
+p2_axis <- ggplot(Adapter_found1, aes(x = sample1, y = factor(1), 
+                                 fill = Batch)) +
+    geom_tile(width = 1) +
+    theme_void() +
+    theme(axis.title.x = element_text()) + theme(legend.position = "right")  +
+    labs(x="Batch Annotation", fill="Batch") 
+
+p2_q<-p2 / p2_axis + plot_layout(heights = c(8,1))  + scale_fill_jama()
+p2_q
+```
+
+# Trimming lexogen adapter
+## Dataframe format
+
+```{r}
+AdapterLex_found<-data.frame(rownames(quality),quality$Batch, quality$Reads.main.adapter.perc, quality$Other.adapter.perc)
+
+colnames(AdapterLex_found)<-c("sample", "Batch", "AdapterLex_found_perc","Other_Adapter_found_perc")
+
+AdapterLex_found<-melt(setDT(AdapterLex_found),id.vars = c("sample", "Batch"))
+```
+
+
+```{r}
+AdapterLex_found <- AdapterLex_found |> 
+  mutate(sample1 = reorder(sample, -ifelse(!variable %in% "AdapterLex_found_perc", 0, value), FUN = sum))
+
+
+p3 <- ggplot(AdapterLex_found,aes(x = sample1, y = value, fill = factor(variable, levels=c("Other_Adapter_found_perc", "AdapterLex_found_perc")), width=1.05)) +
+    geom_bar( stat = "identity", position = position_stack()) +
+    scale_y_continuous(expand = c(0, 0), breaks = seq(0, 100, by = 10)) +
+    labs(x = NULL, y= "% Reads" , title="Lexogen Adapter Reads% Distribution", 
+         fill="Quality Control") +
+    theme(axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.ticks.length.x = unit(0, "pt")) +
+    theme(
+        panel.background = element_rect(fill='transparent'),
+        plot.background = element_rect(fill='transparent', color=NA),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.background = element_rect(fill='transparent'),
+        legend.box.background = element_rect(fill='transparent'),
+        plot.title = element_text(face="bold")
+    ) + scale_fill_uchicago(labels=c("Other adapter found", "Lexogen adapter found"))
+
+AdapterLex_found1 <- AdapterLex_found |>
+    distinct(sample, sample1, Batch)
+
+p3_axis <- ggplot(AdapterLex_found1, aes(x = sample1, y = factor(1), 
+                                 fill = Batch)) +
+    geom_tile(width = 1) +
+    theme_void() +
+    theme(axis.title.x = element_text()) + theme(legend.position = "right")  +
+    labs(x="Batch Annotation", fill="Batch") 
+
+p3_q<-p3 / p3_axis + plot_layout(heights = c(8,1))  + scale_fill_jama()
+p3_q
+```
+
+
+# Total Reads distribution
+## Dataframe format
+
+```{r}
+Total_reads<-data.frame(rownames(quality),quality$Batch, quality$Total.reads)
+
+colnames(Total_reads)<-c("sample", "Batch", "Total_reads")
+
+Total_reads<-melt(setDT(Total_reads),id.vars = c("sample", "Batch"))
+```
+
+```{r}
+Total_reads <- Total_reads |> 
+  mutate(sample1 = reorder(sample, -ifelse(!variable %in% "Total_reads", 0, value), FUN = sum))
+
+
+p4 <- ggplot(Total_reads,aes(x = sample1, y = value, fill = factor(variable, levels=c("Total_reads")), width=1.05)) +
+    geom_bar( stat = "identity", position = position_stack()) +
+    scale_y_continuous(expand = c(0, 0)) +
+    labs(x = NULL, y= "Reads" , title="Total Reads Distribution", 
+         fill="Quality Control") +
+    theme(axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.ticks.length.x = unit(0, "pt")) +
+    theme(
+        panel.background = element_rect(fill='transparent'),
+        plot.background = element_rect(fill='transparent', color=NA),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.background = element_rect(fill='transparent'),
+        legend.box.background = element_rect(fill='transparent'),
+        plot.title = element_text(face="bold")
+    ) + scale_fill_d3(labels=c("Total Reads"))
+
+Total_reads1 <- Total_reads |>
+    distinct(sample, sample1, Batch)
+
+p4_axis <- ggplot(Total_reads1, aes(x = sample1, y = factor(1), 
+                                 fill = Batch)) +
+    geom_tile(width = 1) +
+    theme_void() +
+    theme(axis.title.x = element_text()) + theme(legend.position = "right")  +
+    labs(x="Batch Annotation", fill="Batch") 
+
+p4_q<-p4 / p4_axis + plot_layout(heights = c(8,1))  + scale_fill_jama()
+p4_q
+```
+
